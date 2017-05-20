@@ -1,124 +1,7 @@
 import json
-from typing import Dict, List
+from models import *
+from pprint import pprint
 
-
-class Period:
-    def __init__(self, period: int, name: str, short: str, starttime: str, endtime: str, id: str):
-        self.period = period
-        self.name = name
-        self.short = short
-        self.starttime = starttime
-        self.endtime = endtime
-        self.id = id
-
-    def __str__(self):
-        return str(self.period)+" -> "+self.starttime+" - "+self.endtime
-
-class Day:
-    def __init__(self, name: str, short: str, vals: List, val: int, id: str):
-        self.name = name
-        self.short = short
-        self.vals = vals
-        self.val = val
-        self.id = id
-
-    def __str__(self):
-        return self.name+" ("+self.short+") - "+self.id
-
-class Week:
-    def __init__(self, name: str, short: str, vals: List, val: int, id: str):
-        self.name = name
-        self.short = short
-        self.vals = vals
-        self.val = val
-        self.id = id
-
-    def __str__(self):
-        return self.name + " (" + self.short + ") - " + self.id
-
-class Term:
-    def __init__(self, name: str, short: str, vals: List, val: int, id: str):
-        self.name = name
-        self.short = short
-        self.vals = vals
-        self.val = val
-        self.id = id
-
-    def __str__(self):
-        return self.name + " (" + self.short + ") - " + self.id
-
-class Subject:
-    def __init__(self, name: str, short: str, color: str, id: str):
-        self.name = name
-        self.short = short
-        self.color = color
-        self.id = id
-
-    def __str__(self):
-        return self.id + " - " + self.name + " (" + self.short + ")"
-
-class Teacher:
-    def __init__(self, lastname: str, short: str, color: str, id: str):
-        self.lastname = lastname
-        self.short = short
-        self.color = color
-        self.id = id
-
-    def __str__(self):
-        return self.id + " - " + self.lastname
-
-class Class:
-    def __init__(self, name: str, teacherid: str, id: str):
-        self.name = name
-        self.teacherid = teacherid
-        self.id = id
-
-    def __str__(self):
-        return self.id + " - " + self.name + " ("+self.teacherid+")"
-
-class Classroom:
-    def __init__(self, name: str, id: str):
-        self.name = name
-        self.id = id
-
-    def __str__(self):
-        return self.id + " - " + self.name
-
-class Group:
-    def __init__(self, name: str, entireclass: str, classid: str, id: str):
-        self.name = name
-        self.entireclass = entireclass
-        self.classid = classid
-        self.id = id
-
-    def __str__(self):
-        return self.id + " - " + self.classid + " - " + self.name
-
-class Lesson:
-    def __init__(self, subjectid: str, teacherids: Dict, groupids: Dict, classids: Dict, count: str,
-            classroomids: Dict, id: str):
-        self.subjectid = subjectid
-        self.teacherids = teacherids
-        self.groupids = groupids
-        self.classids = classids
-        self.count = count
-        self.classroomids = classroomids
-        self.id = id
-
-    def __str__(self):
-        return self.id + " - lesson"
-
-class Card:
-    def __init__(self, lessonid: str, period: int, days: str, weeks: str, classroomids: Dict, id: str):
-        self.lessonid = lessonid
-        self.period = period
-        self.days = days
-        self.weeks = weeks
-        self.classroomids = classroomids
-        self.id = id
-
-    def __str__(self):
-        return self.id + " - Period " + str(self.period) + ", days " + self.days
 
 class JsonParser:
     """
@@ -249,19 +132,84 @@ def open_file(filename: str) -> str:
         t = f.read()
     return t
 
+def search_by_id(search_list: List, id: str, attr = "id") -> object:
+    for i in search_list:
+        if i.__getattribute__(attr) == id:
+            r = i
+            break
+    else:  # happens after you break out of the for loop
+        r = None
+    return r
+
+def parse_card(ex_card):
+    ex_lesson = search_by_id(lessons, ex_card.lessonid)
+    return_list = []
+    for x in range(len(ex_lesson.groupids)):
+        if not ex_card.days and not ex_card.weeks:
+            return []
+        dict_model = {
+            'id': '', 'teacher_id': '', 'teacher': '', 'period': '', 'period_start': '', 'period_end': '',
+            'classroom': '', 'subject': '', 'subject_id': '', 'subject_color': '',
+            'class': '', 'class_teacher': '', 'd_monday': 0, 'd_tuesday': 0, 'd_thursday': 0, 'd_wednesday': 0,
+            'd_friday': 0, 'week_a': 0, 'week_b': 1, 'lesson_id': '', 'group_name': '', 'entire_class': ''
+        }
+        if (len(ex_lesson.teacherids)-1 >= x):
+            teacher = search_by_id(teachers, ex_lesson.teacherids[x])
+        else:
+            teacher = search_by_id(teachers, ex_lesson.teacherids[-1])
+        if (len(ex_lesson.classids)-1 >= x):
+            _class = search_by_id(classes, ex_lesson.classids[x])
+        else:
+            _class = search_by_id(classes, ex_lesson.classids[-1])
+        period = search_by_id(periods, str(ex_card.period))
+        classroom = search_by_id(classrooms, str(ex_card.classroomids[0]))
+        subject = search_by_id(subjects, ex_lesson.subjectid)
+        group = search_by_id(groups, ex_lesson.groupids[x])
+        try:
+            class_teacher = search_by_id(teachers, _class.teacherid).lastname
+        except:
+            class_teacher = ""
+        _dlist = [
+            'd_monday', 'd_tuesday', 'd_thursday', 'd_wednesday', 'd_friday']
+        for n in range(len(ex_card.days)):
+            dict_model[_dlist[n]] = int(ex_card.days[n])
+        dict_model['week_a'] = int(ex_card.weeks[0])
+        dict_model['week_b'] = int(ex_card.weeks[1])
+        dict_model['teacher'] = teacher.lastname
+        dict_model['teacher_id'] = teacher.id
+        dict_model['lesson_id'] = ex_lesson.id
+        dict_model['id'] = ex_card.id
+        dict_model['period'] = period.period
+        dict_model['period_start'] = period.starttime
+        dict_model['period_end'] = period.endtime
+        dict_model['classroom'] = classroom.name
+        dict_model['class'] = _class.name
+        dict_model['class_teacher'] = class_teacher
+        dict_model['group_name'] = group.name
+        dict_model['entire_class'] = group.entireclass
+        dict_model['subject'] = subject.name
+        dict_model['subject_color'] = subject.color
+        dict_model['subject_id'] = subject.id
+        return_list.append(dict_model)
+    return return_list
+
+
 src = SourceParser(open_file('plan.html'))
 jsn = JsonParser(src.json)
-combinated = jsn.return_periods()
-combinated += jsn.return_days()
-combinated += jsn.return_weeks()
-combinated += jsn.return_terms()
-combinated += jsn.return_subjects()
-combinated += jsn.return_teachers()
-combinated += jsn.return_classes()
-combinated += jsn.return_classrooms()
-combinated += jsn.return_groups()
-combinated += jsn.return_lessons()
-combinated += jsn.return_cards()
-for p in combinated:
-    print(p)
+periods = jsn.return_periods()
+days = jsn.return_days()
+weeks = jsn.return_weeks()
+terms = jsn.return_terms()
+subjects = jsn.return_subjects()
+teachers = jsn.return_teachers()
+classes = jsn.return_classes()
+classrooms = jsn.return_classrooms()
+groups = jsn.return_groups()
+lessons = jsn.return_lessons()
+cards = jsn.return_cards()
+
+for card in cards:
+    pprint(parse_card(card))
+
+
 
