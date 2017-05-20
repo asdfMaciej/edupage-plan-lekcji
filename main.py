@@ -1,4 +1,4 @@
-import json
+import json, sqlite3
 from models import *
 from pprint import pprint
 
@@ -126,6 +126,32 @@ class SourceParser:
     def extract_json(self, html:str) -> Dict:
         return json.loads(html)
 
+class SqliteExport:
+    def __init__(self, fname: str):
+        self.con = sqlite3.connect(fname)
+        self.cur = self.con.cursor()
+
+    def delete(self):
+        self.con.execute('DELETE FROM jednostki_lekcyjne;')
+        self.con.commit()
+
+    def close(self):
+        self.con.commit()
+        self.con.close()
+
+    def export(self, d: dict):
+        dict_model = {
+            'id': '', 'teacher_id': '', 'teacher': '', 'period': '', 'period_start': '', 'period_end': '',
+            'classroom': '', 'subject': '', 'subject_id': '', 'subject_color': '',
+            'class': '', 'class_teacher': '', 'd_monday': 0, 'd_tuesday': 0, 'd_thursday': 0, 'd_wednesday': 0,
+            'd_friday': 0, 'week_a': 0, 'week_b': 1, 'lesson_id': '', 'group_name': '', 'entire_class': ''
+        }
+
+        #cur.execute(
+        #    "CREATE TABLE jednostki_lekcyjne ("+', '.join(sorted(list(dict_model.keys())))+");")  # use your column names here
+        query = "INSERT INTO jednostki_lekcyjne ("+', '.join(sorted(list(dict_model.keys())))+") VALUES ("+', '.join(['?']*len(list(dict_model.keys())))+");"
+        self.cur.executemany(
+            query, [tuple(value for (key, value) in sorted(d.items()))])
 
 def open_file(filename: str) -> str:
     with open(filename, 'r') as f:
@@ -208,8 +234,14 @@ groups = jsn.return_groups()
 lessons = jsn.return_lessons()
 cards = jsn.return_cards()
 
+f = True
+sq = SqliteExport('baza.db')
+sq.delete()
 for card in cards:
+    for x in parse_card(card):
+        sq.export(x)
     pprint(parse_card(card))
+sq.close()
 
 
 
