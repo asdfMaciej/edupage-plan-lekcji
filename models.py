@@ -95,13 +95,14 @@ class Group:
 
 class Lesson:
     def __init__(self, subjectid: str, teacherids: List, groupids: List, classids: List, count: str,
-            classroomids: Dict, id: str):
+            classroomids: Dict, id: str, durationperiods: str):
         self.subjectid = subjectid
         self.teacherids = teacherids
         self.groupids = groupids
         self.classids = classids
         self.count = count
         self.classroomids = classroomids
+        self.durationperiods = durationperiods
         self.id = id
 
     def __str__(self):
