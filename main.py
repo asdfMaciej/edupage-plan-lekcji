@@ -1,4 +1,5 @@
 import json, sqlite3
+import re
 from models import *
 from pprint import pprint
 
@@ -21,9 +22,15 @@ class JsonParser:
             json.dump(self.json, outfile,
                       indent=4, sort_keys=True,
                       separators=(',', ': '))
+
+    def get_row(self, name):
+        for row in self.json['r']['dbiAccessorRes']['tables']:
+            if row['id'] == name:
+                return row['data_rows']
+
     def return_periods(self) -> List:
         periods = []
-        rows = self.json['changes'][1]['rows']
+        rows = self.get_row('periods') #self.json['changes'][1]['rows']
         for row in rows:
             periods.append(Period(
                 row["period"], row["name"], row["short"], row["starttime"], row["endtime"], row["id"]
@@ -32,7 +39,7 @@ class JsonParser:
 
     def return_days(self) -> List:
         days = []
-        rows = self.json['changes'][3]['rows']
+        rows = self.get_row('daysdefs')
         for row in rows:
             days.append(Day(
                 row["name"], row["short"], row["vals"], row["val"], row["id"]
@@ -41,7 +48,7 @@ class JsonParser:
 
     def return_weeks(self) -> List:
         weeks = []
-        rows = self.json['changes'][4]['rows']
+        rows = self.get_row('weeksdefs')
         for row in rows:
             weeks.append(Week(
                 row["name"], row["short"], row["vals"], self._int(row["val"]), row["id"]
@@ -50,7 +57,7 @@ class JsonParser:
 
     def return_terms(self) -> List:
         terms = []
-        rows = self.json['changes'][5]['rows']
+        rows = self.get_row('termsdefs')
         for row in rows:
             terms.append(Term(
                 row["name"], row["short"], row["vals"], self._int(row["val"]), row["id"]
@@ -59,7 +66,7 @@ class JsonParser:
 
     def return_subjects(self) -> List:
         subjects = []
-        rows = self.json['changes'][7]['rows']
+        rows = self.get_row('subjects')
         for row in rows:
             subjects.append(Subject(
                 row["name"], row["short"], row["color"], row["id"]
@@ -68,16 +75,16 @@ class JsonParser:
 
     def return_teachers(self) -> List:
         teachers = []
-        rows = self.json['changes'][8]['rows']
+        rows = self.get_row('teachers')
         for row in rows:
             teachers.append(Teacher(
-                row["lastname"], row["short"], row["color"], row["id"]
+                row["short"], row["color"], row["id"]
             ))
         return teachers
 
     def return_classes(self) -> List:
         classes = []
-        rows = self.json['changes'][6]['rows']
+        rows = self.get_row('classes')
         for row in rows:
             classes.append(Class(
                 row["name"], row["teacherid"], row["id"]
@@ -86,7 +93,7 @@ class JsonParser:
 
     def return_classrooms(self) -> List:
         classrooms = []
-        rows = self.json['changes'][9]['rows']
+        rows = self.get_row('classrooms')
         for row in rows:
             classrooms.append(Classroom(
                 row["name"], row["id"]
@@ -95,7 +102,7 @@ class JsonParser:
 
     def return_groups(self) -> List:
         groups = []
-        rows = self.json['changes'][10]['rows']
+        rows = self.get_row('groups')
         for row in rows:
             groups.append(Group(
                 row["name"], row["entireclass"], row["classid"], row["id"]
@@ -104,7 +111,7 @@ class JsonParser:
 
     def return_lessons(self) -> List:
         lessons = []
-        rows = self.json['changes'][11]['rows']
+        rows = self.get_row('lessons')
         for row in rows:
             lessons.append(Lesson(
                 row["subjectid"], row["teacherids"], row["groupids"], row["classids"], row["count"],
@@ -114,7 +121,7 @@ class JsonParser:
 
     def return_cards(self) -> List:
         cards = []
-        rows = self.json['changes'][12]['rows']
+        rows = self.get_row('cards')
         for row in rows:
             cards.append(Card(
                 row["lessonid"], row["period"], row["days"], row["weeks"], row["classroomids"], row["id"]
@@ -127,7 +134,8 @@ class SourceParser:
         self.json = self.extract_json(self.html)
 
     def extract_html(self, html:str) -> str:
-        return html.split('.app.Sync(')[1].split(');')[0]
+        return html
+
     def extract_json(self, html:str) -> Dict:
         return json.loads(html)
 
@@ -139,6 +147,7 @@ class SqliteExport:
     def delete(self):
         self.con.execute('DELETE FROM jednostki_lekcyjne;')
         self.con.commit()
+        pass
 
     def close(self):
         self.con.commit()
@@ -152,14 +161,14 @@ class SqliteExport:
             'd_friday': 0, 'week_a': 0, 'week_b': 1, 'lesson_id': '', 'group_name': '', 'entire_class': ''
         }
 
-        #cur.execute(
+        #self.cur.execute(
         #    "CREATE TABLE jednostki_lekcyjne ("+', '.join(sorted(list(dict_model.keys())))+");")  # use your column names here
         query = "INSERT INTO jednostki_lekcyjne ("+', '.join(sorted(list(dict_model.keys())))+") VALUES ("+', '.join(['?']*len(list(dict_model.keys())))+");"
         self.cur.executemany(
             query, [tuple(value for (key, value) in sorted(d.items()))])
 
 def open_file(filename: str) -> str:
-    with open(filename, 'r') as f:
+    with open(filename, 'r', encoding="utf-8") as f:
         t = f.read()
     return t
 
@@ -195,8 +204,12 @@ def parse_card(ex_card):
                 _class = search_by_id(classes, ex_lesson.classids[x])
             else:
                 _class = search_by_id(classes, ex_lesson.classids[-1])
-            period = search_by_id(periods, str(ex_card.period+fakeboi))
-            classroom = search_by_id(classrooms, str(ex_card.classroomids[0]))
+            period = search_by_id(periods, str(int(ex_card.period)+fakeboi))
+            #print(ex_card.classroomids)
+            try:
+                classroom = search_by_id(classrooms, str(ex_card.classroomids[0]))
+            except:
+                classroom = Classroom('---', 666)
             subject = search_by_id(subjects, ex_lesson.subjectid)
             group = search_by_id(groups, ex_lesson.groupids[x])
             try:
@@ -209,10 +222,12 @@ def parse_card(ex_card):
                 dict_model[_dlist[n]] = int(ex_card.days[n])
             dict_model['week_a'] = int(ex_card.weeks[0])
             dict_model['week_b'] = int(ex_card.weeks[1])
-            dict_model['teacher'] = teacher.lastname
+            dict_model['teacher'] = teacher.short
             dict_model['teacher_id'] = teacher.id
             dict_model['lesson_id'] = ex_lesson.id
             dict_model['id'] = ex_card.id
+            if not period:
+                continue
             dict_model['period'] = period.period
             dict_model['period_start'] = period.starttime
             dict_model['period_end'] = period.endtime
@@ -229,7 +244,7 @@ def parse_card(ex_card):
     return return_list
 
 
-src = SourceParser(open_file('plan.html'))
+src = SourceParser(open_file('plan.json'))
 jsn = JsonParser(src.json)
 jsn.dump()
 periods = jsn.return_periods()
@@ -250,7 +265,7 @@ sq.delete()
 for card in cards:
     for x in parse_card(card):
         sq.export(x)
-    pprint(parse_card(card))
+    #pprint(parse_card(card))
 sq.close()
 
 

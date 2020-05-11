@@ -57,8 +57,7 @@ class Subject:
         return self.id + " - " + self.name + " (" + self.short + ")"
 
 class Teacher:
-    def __init__(self, lastname: str, short: str, color: str, id: str):
-        self.lastname = lastname
+    def __init__(self, short: str, color: str, id: str):
         self.short = short
         self.color = color
         self.id = id
